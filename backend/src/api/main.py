@@ -1,6 +1,7 @@
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -29,11 +30,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for frontend development
+# CORS middleware: configurable origins with support for local dev, custom domains, and Vercel previews
+raw_cors = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173")
+cors_regex = os.getenv("CORS_ORIGIN_REGEX", r"^https:\/\/.*\.vercel\.app$")
+
+if raw_cors.strip() == "*":
+    allow_origins = ["*"]
+    allow_credentials = False
+else:
+    allow_origins = [o.strip() for o in raw_cors.split(",") if o.strip()]
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_origin_regex=cors_regex if allow_credentials else None,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -92,10 +104,12 @@ class RunSummaryResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Router Definition (handles both /api/* and /* for transparent Vercel routing)
 # ---------------------------------------------------------------------------
+api_router = APIRouter()
 
-@app.get("/api/health")
+
+@api_router.get("/health")
 def health_check():
     return {
         "status": "healthy",
@@ -105,7 +119,7 @@ def health_check():
     }
 
 
-@app.post("/api/graph/generate", response_model=Graph)
+@api_router.post("/graph/generate", response_model=Graph)
 def api_generate_graph(req: GraphGenerateRequest):
     try:
         graph = generate_graph(
@@ -123,12 +137,12 @@ def api_generate_graph(req: GraphGenerateRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/graph/validate")
+@api_router.post("/graph/validate")
 def api_validate_graph(graph: Graph):
     return {"valid": True, "graph": graph}
 
 
-@app.post("/api/search/run", response_model=SearchRunResponse)
+@api_router.post("/search/run", response_model=SearchRunResponse)
 def api_run_search(req: SearchRunRequest, db: Session = Depends(get_db)):
     algo = req.algorithm.strip().upper()
     valid_algos = {"BFS", "DFS", "DFID-N", "DFID-C"}
@@ -195,7 +209,7 @@ def api_run_search(req: SearchRunRequest, db: Session = Depends(get_db)):
     )
 
 
-@app.get("/api/runs", response_model=List[RunSummaryResponse])
+@api_router.get("/runs", response_model=List[RunSummaryResponse])
 def api_list_runs(limit: int = 50, db: Session = Depends(get_db)):
     try:
         runs = (
@@ -223,7 +237,7 @@ def api_list_runs(limit: int = 50, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/runs/{run_id}")
+@api_router.get("/runs/{run_id}")
 def api_get_run(run_id: str, db: Session = Depends(get_db)):
     run_rec = db.query(RunRecord).filter(RunRecord.id == run_id).first()
     if not run_rec:
@@ -245,3 +259,8 @@ def api_get_run(run_id: str, db: Session = Depends(get_db)):
         "events": run_rec.events_json,
         "created_at": run_rec.created_at.isoformat() if run_rec.created_at else "",
     }
+
+
+# Mount router: enables both direct /api/* and transparent Vercel serverless /* calls
+app.include_router(api_router, prefix="/api")
+app.include_router(api_router)

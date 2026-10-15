@@ -82,15 +82,23 @@ cd ..
 
 ## ⚙️ Environment Variables
 
-Configure environment variables in `.env` in the project root:
+Copy the provided [`.env.example`](file:///c:/Users/Devam/Desktop/AI/.env.example) to `.env` in the project root:
 
 ```bash
-# Database connection string (NeonDB or PostgreSQL)
-# Example: postgresql+psycopg://user:password@ep-xyz.neon.tech/neondb?sslmode=require
-DATABASE_URL=sqlite:///./visualizer.db
+cp .env.example .env
 ```
 
-> **Note**: If `DATABASE_URL` is omitted, the application automatically defaults to `sqlite:///./visualizer.db`.
+| Variable | Default | Purpose |
+|---|---|---|
+| `ENVIRONMENT` | `development` | Set to `production` in live environments |
+| `DATABASE_URL` | `sqlite:///./visualizer.db` | PostgreSQL connection string or SQLite path |
+| `DB_POOL_SIZE` | `10` | SQLAlchemy connection pool size (Postgres) |
+| `DB_MAX_OVERFLOW` | `20` | Max overflow connections above pool size |
+| `CORS_ORIGINS` | `http://localhost:5173,...` | Comma-separated list of allowed frontend origins |
+| `CORS_ORIGIN_REGEX` | `^https:\/\/.*\.vercel\.app$` | Regex allowing all Vercel preview domains |
+| `VITE_API_URL` | `""` | Base API URL for frontend (leave blank for local proxy or Vercel rewrites) |
+
+For complete deployment architectures and step-by-step instructions, see [**DEPLOYMENT.md**](file:///c:/Users/Devam/Desktop/AI/DEPLOYMENT.md).
 
 ---
 

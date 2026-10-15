@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import type { RunSummary } from '../types'
 import { X, History, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react'
+import { apiUrl } from '../utils/api'
 
 interface HistoryModalProps {
   isOpen: boolean
@@ -19,7 +20,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   const fetchRuns = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/runs')
+      const res = await fetch(apiUrl('/api/runs'))
       if (res.ok) {
         const data = await res.json()
         setRuns(data)

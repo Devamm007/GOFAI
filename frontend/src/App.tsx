@@ -9,6 +9,7 @@ import { StatsBanner } from './components/StatsBanner'
 import { GraphConfigModal } from './components/GraphConfigModal'
 import { HistoryModal } from './components/HistoryModal'
 import { Network, Sliders, History, Zap, RotateCcw } from 'lucide-react'
+import { apiUrl } from './utils/api'
 
 const DEFAULT_GRAPH: GraphData = {
   nodes: ['S', 'A', 'B', 'C', 'D', 'E', 'G'],
@@ -49,7 +50,7 @@ export const App: React.FC = () => {
     try {
       setIsLoading(true)
       setIsPlaying(false)
-      const res = await fetch('/api/search/run', {
+      const res = await fetch(apiUrl('/api/search/run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,7 +166,7 @@ export const App: React.FC = () => {
   const handleGenerateGraph = async (params: any) => {
     try {
       setIsLoading(true)
-      const res = await fetch('/api/graph/generate', {
+      const res = await fetch(apiUrl('/api/graph/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -191,7 +192,7 @@ export const App: React.FC = () => {
   const handleLoadRun = async (runId: string) => {
     try {
       setIsLoading(true)
-      const res = await fetch(`/api/runs/${runId}`)
+      const res = await fetch(apiUrl(`/api/runs/${runId}`))
       if (!res.ok) throw new Error('Failed to load past run')
       const data = await res.json()
 

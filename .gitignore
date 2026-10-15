@@ -1,6 +1,60 @@
-__pycache__
-venv
-.venv
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment Variables & Secrets
 .env
-.pytest_cache
+.env.local
+.env.*.local
+*.env
+
+# SQLite & Database storage
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 visualizer.db
+
+# Frontend / Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# Vercel & Deployments
+.vercel/
+
+# OS metadata
+.DS_Store
+Thumbs.db

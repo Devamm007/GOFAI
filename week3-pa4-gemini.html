@@ -1,0 +1,2077 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blocks World 6-Block Heuristic Landscape Visualizer (h1, h2, h3, h4)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            overflow: hidden;
+        }
+
+        .font-display {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .font-mono-code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-panel-elevated {
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.6);
+        }
+
+        /* Floor Level skyscraper styling */
+        .floor-badge {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        /* Block distinct colors */
+        .block-A { background: linear-gradient(135deg, #06b6d4, #0891b2); border-color: #22d3ee; }
+        .block-B { background: linear-gradient(135deg, #f59e0b, #d97706); border-color: #fbbf24; }
+        .block-C { background: linear-gradient(135deg, #10b981, #059669); border-color: #34d399; }
+        .block-D { background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-color: #a78bfa; }
+        .block-E { background: linear-gradient(135deg, #ec4899, #db2777); border-color: #f472b6; }
+        .block-F { background: linear-gradient(135deg, #3b82f6, #2563eb); border-color: #60a5fa; }
+
+        /* Glowing pulses */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .animate-pulse-glow {
+            animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen flex flex-col select-none">
+
+    <!-- Top Header Navigation -->
+    <header class="h-14 glass-panel border-b border-slate-800/80 px-5 flex items-center justify-between shrink-0 z-30">
+        <div class="flex items-center space-x-3.5">
+            <a href="/" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/90 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 transition flex items-center space-x-1.5 shadow-sm" title="Return to AI Search Lab Home">
+                <i class="fa-solid fa-arrow-left"></i><span>Lab Home</span>
+            </a>
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                <i class="fa-solid fa-cubes-stacked text-base"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="font-display font-bold text-slate-100 text-base leading-tight tracking-tight">Blocks World Landscape Visualizer</h1>
+                    <span id="active-heuristic-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                        h2: Level Structure
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400">6 Blocks (A..F) Skyscraper Levels & Topographic Search Landscape</p>
+            </div>
+        </div>
+
+        <!-- Center Controls: View Modes & Config Toggle -->
+        <div class="flex items-center space-x-2">
+            <!-- View Mode Switcher -->
+            <div class="bg-slate-900/90 p-1 rounded-xl border border-slate-800 flex space-x-1 shadow-inner">
+                <button id="btn-view-3d" onclick="switchViewMode('3d')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition flex items-center space-x-1.5 shadow-md">
+                    <i class="fa-solid fa-cube"></i><span>3D Surface</span>
+                </button>
+                <button id="btn-view-graph" onclick="switchViewMode('graph')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-network-wired"></i><span>State Graph</span>
+                </button>
+                <button id="btn-view-contour" onclick="switchViewMode('contour')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-map"></i><span>2D Contour</span>
+                </button>
+            </div>
+
+            <button onclick="toggleConfigDrawer()" id="btn-toggle-config"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700/80 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-sliders text-indigo-400"></i><span>Configure Inputs</span>
+            </button>
+        </div>
+
+        <!-- Right Quick Actions -->
+        <div class="flex items-center space-x-2">
+            <button onclick="triggerHillClimbing()"
+                class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-900/30 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-play"></i><span>Run Hill Climbing</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Area -->
+    <div class="flex-1 relative flex overflow-hidden">
+
+        <!-- Left/Top Floating Configuration Drawer (Collapsible) -->
+        <div id="config-drawer" class="absolute top-0 left-0 right-96 z-40 glass-panel-elevated p-4 border-b border-indigo-500/20 shadow-2xl transition-all duration-300 transform -translate-y-full max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-indigo-400 text-sm"></i>
+                    <h2 class="font-display font-bold text-slate-100 text-sm">Search Space & Landscape Configuration</h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-slate-400">Quick Presets:</span>
+                    <button onclick="loadPreset('lecture')" class="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-semibold transition">
+                        🎓 Khemani Week 3 Lecture
+                    </button>
+                    <button onclick="loadPreset('trap')" class="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 rounded-lg text-xs font-semibold transition">
+                        ⚠️ Local Peak Trap (h1)
+                    </button>
+                    <button onclick="loadPreset('invert')" class="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold transition">
+                        🔄 Inverted Tower
+                    </button>
+                    <button onclick="loadPreset('table')" class="px-2.5 py-1 bg-sky-500/10 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 rounded-lg text-xs font-semibold transition">
+                        🏙️ Dispersed to Tower
+                    </button>
+                    <button onclick="generateRandomConfig()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition">
+                        🎲 Random
+                    </button>
+                    <button onclick="toggleConfigDrawer()" class="text-slate-400 hover:text-white p-1 ml-2">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-4">
+                <!-- Start State Input -->
+                <div class="col-span-4 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-bold text-sky-400 flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
+                            <span>Start State (S)</span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">Format: [D,C,B,A],[F,E]</span>
+                    </div>
+                    <input id="input-start-state" type="text" value="[D, C, B, A], [F, E]"
+                        class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono-code text-slate-100 focus:outline-none focus:border-sky-500 transition mb-2"
+                        placeholder="[D, C, B, A], [F, E]">
+                    <div id="start-state-preview" class="min-h-[50px] p-2 bg-slate-950/60 rounded-lg border border-slate-800/80 flex gap-2 items-end justify-center">
+                        <!-- Dynamic miniature stacks render -->
+                    </div>
+                </div>
+
+                <!-- Goal State Input -->
+                <div class="col-span-4 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-bold text-emerald-400 flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+                            <span>Goal State (G)</span>
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-mono">Format: [D,C,B,E,A],[F]</span>
+                    </div>
+                    <input id="input-goal-state" type="text" value="[D, C, B, E, A], [F]"
+                        class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono-code text-slate-100 focus:outline-none focus:border-emerald-500 transition mb-2"
+                        placeholder="[D, C, B, E, A], [F]">
+                    <div id="goal-state-preview" class="min-h-[50px] p-2 bg-slate-950/60 rounded-lg border border-slate-800/80 flex gap-2 items-end justify-center">
+                        <!-- Dynamic miniature stacks render -->
+                    </div>
+                </div>
+
+                <!-- Heuristic Selection -->
+                <div class="col-span-4 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-bold text-indigo-400">Chosen Heuristic Function</label>
+                            <span class="text-[10px] text-slate-400">4 Lecture Definitions</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 mb-2">
+                            <button type="button" onclick="selectHeuristic('h1')" id="opt-h1"
+                                class="p-2 rounded-lg border border-slate-700 text-left transition text-xs font-medium bg-slate-950 hover:border-indigo-500">
+                                <div class="font-bold text-slate-200">h1: Local Support</div>
+                                <div class="text-[10px] text-slate-400">+1 correct, -1 wrong</div>
+                            </button>
+                            <button type="button" onclick="selectHeuristic('h2')" id="opt-h2"
+                                class="p-2 rounded-lg border border-indigo-500 bg-indigo-600/20 text-left transition text-xs font-medium">
+                                <div class="font-bold text-indigo-300">h2: Level Structure</div>
+                                <div class="text-[10px] text-indigo-400/90">+n struct, -n wrong</div>
+                            </button>
+                            <button type="button" onclick="selectHeuristic('h3')" id="opt-h3"
+                                class="p-2 rounded-lg border border-slate-700 text-left transition text-xs font-medium bg-slate-950 hover:border-indigo-500">
+                                <div class="font-bold text-slate-200">h3: Misplaced</div>
+                                <div class="text-[10px] text-slate-400">Count not in final pos (min)</div>
+                            </button>
+                            <button type="button" onclick="selectHeuristic('h4')" id="opt-h4"
+                                class="p-2 rounded-lg border border-slate-700 text-left transition text-xs font-medium bg-slate-950 hover:border-indigo-500">
+                                <div class="font-bold text-slate-200">h4: Correct Blocks</div>
+                                <div class="text-[10px] text-slate-400">Count in final pos (max)</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Landscape Scope Slider & Generate Button -->
+                    <div class="flex items-center space-x-2 pt-1 border-t border-slate-800">
+                        <div class="flex-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                                <span>Landscape Exploration Scope</span>
+                                <span id="scope-label" class="font-mono text-indigo-400">Extended (120 states)</span>
+                            </div>
+                            <input id="scope-slider" type="range" min="40" max="250" value="120" step="20"
+                                oninput="updateScopeLabel(this.value)"
+                                class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <button onclick="generateLandscapeFromInputs()"
+                            class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center space-x-1.5 shrink-0">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate Landscape</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error banner -->
+            <div id="input-error-banner" class="hidden mt-2 p-2 bg-rose-500/20 border border-rose-500/40 rounded-lg text-xs text-rose-300 flex items-center space-x-2">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="input-error-text">Invalid configuration</span>
+            </div>
+        </div>
+
+        <!-- 3D / Visualization Canvas Container -->
+        <div id="viewport" class="flex-1 h-full w-full relative bg-slate-950 cursor-grab active:cursor-grabbing">
+
+            <!-- Canvas target -->
+            <div id="canvas-container" class="w-full h-full"></div>
+
+            <!-- 2D Canvas Fallback / Overlay for Contour View -->
+            <canvas id="contour-canvas" class="hidden absolute inset-0 w-full h-full z-10 pointer-events-auto bg-slate-950"></canvas>
+
+            <!-- Viewport HUD Overlay (Top-Left) -->
+            <div class="absolute top-4 left-4 z-20 flex flex-col gap-2 max-w-xs pointer-events-none">
+                <!-- Preset States Quick Pick -->
+                <div class="glass-panel p-3 rounded-2xl shadow-xl pointer-events-auto">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+                        <span>Landscape Key Anchors</span>
+                        <i class="fa-solid fa-mountain text-indigo-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button onclick="focusKeyAnchor('goal')"
+                            class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold transition text-left flex items-center justify-between">
+                            <span class="flex items-center space-x-1"><i class="fa-solid fa-flag-checkered text-[10px]"></i><span>Goal (G)</span></span>
+                            <span id="hud-score-goal" class="text-[10px] font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">+16</span>
+                        </button>
+                        <button onclick="focusKeyAnchor('start')"
+                            class="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-xs font-semibold transition text-left flex items-center justify-between">
+                            <span class="flex items-center space-x-1"><i class="fa-solid fa-play text-[10px]"></i><span>Start (S)</span></span>
+                            <span id="hud-score-start" class="text-[10px] font-mono bg-sky-500/20 px-1.5 py-0.5 rounded text-sky-300">+1</span>
+                        </button>
+                        <button onclick="focusKeyAnchor('peak')" id="btn-anchor-peak"
+                            class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition text-left flex items-center justify-between">
+                            <span class="flex items-center space-x-1"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i><span>Local Peak</span></span>
+                            <span id="hud-score-peak" class="text-[10px] font-mono bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">--</span>
+                        </button>
+                        <button onclick="focusKeyAnchor('pit')" id="btn-anchor-pit"
+                            class="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition text-left flex items-center justify-between">
+                            <span class="flex items-center space-x-1"><i class="fa-solid fa-arrow-down text-[10px]"></i><span>Valley (Min)</span></span>
+                            <span id="hud-score-pit" class="text-[10px] font-mono bg-rose-500/20 px-1.5 py-0.5 rounded text-rose-300">--</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Legend & Heuristic Insight Badge -->
+                <div class="glass-panel p-3 rounded-2xl shadow-xl text-xs space-y-1.5 pointer-events-auto">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-300 text-[11px] uppercase tracking-wider">Topographic Map Legend</span>
+                        <span id="legend-metric" class="text-[10px] text-indigo-400 font-mono">Elevation = Heuristic</span>
+                    </div>
+                    <div class="flex items-center text-[11px] text-slate-400">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block mr-2 shadow-sm shadow-emerald-500/50"></span>
+                        High Mountain (High Heuristic / Closer to Goal)
+                    </div>
+                    <div class="flex items-center text-[11px] text-slate-400">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block mr-2 shadow-sm shadow-amber-500/50"></span>
+                        Plateau / Neutral Zone
+                    </div>
+                    <div class="flex items-center text-[11px] text-slate-400">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block mr-2 shadow-sm shadow-rose-500/50"></span>
+                        Deep Canyon / Severe Penalty
+                    </div>
+                    <div class="flex items-center text-[11px] text-slate-400">
+                        <span class="w-2.5 h-0.5 bg-cyan-400 inline-block mr-2 shadow-sm shadow-cyan-400/50"></span>
+                        Glowing Cyan Trail = Hill Climbing Trajectory
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hover Tooltip -->
+            <div id="hover-tooltip"
+                class="absolute pointer-events-none opacity-0 transition-opacity duration-150 glass-panel-elevated text-xs text-slate-200 p-3 rounded-xl shadow-2xl z-40">
+                <div class="flex items-center justify-between space-x-2 mb-1">
+                    <div id="tooltip-title" class="font-bold text-indigo-300">State Node</div>
+                    <span id="tooltip-category" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300">--</span>
+                </div>
+                <div id="tooltip-stacks" class="font-mono text-[11px] text-slate-300 mb-1">Stacks: --</div>
+                <div id="tooltip-score" class="font-bold text-emerald-400 text-xs">Score: --</div>
+            </div>
+
+            <!-- Viewport Control Buttons (Bottom-Left) -->
+            <div class="absolute bottom-4 left-4 z-20 flex space-x-2">
+                <button onclick="resetCamera()"
+                    class="p-2.5 glass-panel hover:bg-slate-800 text-slate-300 rounded-xl shadow-lg text-xs font-medium transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-arrows-to-dot"></i><span>Reset View</span>
+                </button>
+                <button id="toggle-wireframe-btn" onclick="toggleWireframe()"
+                    class="p-2.5 glass-panel hover:bg-slate-800 text-slate-300 rounded-xl shadow-lg text-xs font-medium transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-border-all"></i><span>Wireframe</span>
+                </button>
+                <button id="toggle-edges-btn" onclick="toggleEdges()"
+                    class="p-2.5 glass-panel hover:bg-slate-800 text-slate-300 rounded-xl shadow-lg text-xs font-medium transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-bezier-curve"></i><span>Move Transitions</span>
+                </button>
+            </div>
+
+            <!-- Bottom Floating Hill Climbing Trajectory Player -->
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 glass-panel-elevated px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-3 max-w-lg w-full">
+                <div class="flex items-center space-x-1.5">
+                    <button onclick="stepTrajectory(-1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">
+                        <i class="fa-solid fa-step-backward text-xs"></i>
+                    </button>
+                    <button id="btn-play-trajectory" onclick="togglePlayTrajectory()" class="w-8 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition shadow-md">
+                        <i class="fa-solid fa-play text-xs"></i>
+                    </button>
+                    <button onclick="stepTrajectory(1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">
+                        <i class="fa-solid fa-step-forward text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1">
+                    <div class="flex justify-between items-center text-[11px] mb-1">
+                        <span id="trajectory-status-badge" class="font-bold text-emerald-400 flex items-center space-x-1">
+                            <i class="fa-solid fa-route"></i><span>Hill Climbing Trace</span>
+                        </span>
+                        <span id="trajectory-step-text" class="text-slate-400 font-mono">Step 0 / 0</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div id="trajectory-progress-bar" class="bg-gradient-to-r from-sky-400 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <div id="trajectory-outcome-pill" class="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-800 text-slate-300 shrink-0">
+                    Ready
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side Panel: Skyscraper State Inspector & Mathematical Breakdown -->
+        <aside class="w-96 glass-panel border-l border-slate-800/80 flex flex-col shrink-0 z-20 overflow-y-auto">
+
+            <!-- Selected State Header -->
+            <div class="p-4 border-b border-slate-800">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-crosshairs"></i><span>State Inspector</span>
+                    </span>
+                    <span id="selected-state-tag"
+                        class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Select a Node
+                    </span>
+                </div>
+
+                <!-- Skyscraper Block Configuration Render Box -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 min-h-[190px] flex flex-col justify-end items-center relative overflow-hidden shadow-inner">
+                    <!-- Ground/Table surface line -->
+                    <div class="absolute bottom-0 inset-x-0 h-3 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-t border-slate-600 flex items-center justify-center">
+                        <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Table (Level 1 Foundation)</span>
+                    </div>
+
+                    <!-- Skyscraper Tower render area -->
+                    <div id="skyscraper-render-area" class="flex gap-4 items-end z-10 pb-4 min-h-[140px] max-w-full overflow-x-auto">
+                        <div class="text-slate-500 text-xs italic self-center">Click any node on the terrain or graph to inspect block skyscrapers</div>
+                    </div>
+                </div>
+
+                <!-- Total Score Summary Card -->
+                <div class="mt-3 p-3 bg-slate-900/90 border border-slate-800 rounded-xl flex items-center justify-between shadow-lg">
+                    <div>
+                        <div id="inspector-heuristic-label" class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total h2 Evaluation</div>
+                        <div id="inspector-score-text" class="text-2xl font-black font-display text-slate-100">--</div>
+                    </div>
+                    <div id="inspector-badge" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        --
+                    </div>
+                </div>
+            </div>
+
+            <!-- Block-by-Block Evaluation Table -->
+            <div class="p-4 border-b border-slate-800 flex-1">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-list-check text-indigo-400"></i>
+                        <span>Skyscraper Floors Breakdown</span>
+                    </h3>
+                    <span class="text-[10px] text-slate-400">Levels 1 to 6</span>
+                </div>
+
+                <div class="overflow-hidden rounded-xl border border-slate-800/90 bg-slate-950/60 shadow-lg">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/90 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-800">
+                            <tr>
+                                <th class="p-2">Block</th>
+                                <th class="p-2 text-center">Level (n)</th>
+                                <th class="p-2">Under</th>
+                                <th class="p-2 text-center">Correct?</th>
+                                <th class="p-2 text-right">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdown-tbody" class="divide-y divide-slate-800/60 font-mono-code text-[11px]">
+                            <tr>
+                                <td colspan="5" class="p-4 text-center text-slate-500 italic font-sans">No state selected</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mathematical Formula Display -->
+                <div id="math-formula-box" class="mt-2.5 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] font-mono-code text-indigo-300 flex items-center justify-between">
+                    <span class="text-slate-400 font-sans text-[10px] uppercase font-bold">Sum Formula:</span>
+                    <span id="math-formula-text">--</span>
+                </div>
+            </div>
+
+            <!-- MoveGen Neighbors Drawer -->
+            <div class="p-4 border-b border-slate-800">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-arrows-split-up-and-left text-teal-400"></i>
+                        <span>MoveGen() Successors</span>
+                    </h3>
+                    <span id="movegen-count-badge" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-teal-300 font-mono">0 moves</span>
+                </div>
+                <div id="movegen-neighbors-list" class="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                    <div class="text-slate-500 text-xs italic">Select a state to inspect possible legal moves</div>
+                </div>
+            </div>
+
+            <!-- All 4 Heuristics Comparative Matrix -->
+            <div class="p-4 bg-slate-950/70 border-b border-slate-800">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center justify-between">
+                    <span>Heuristics Comparison Matrix</span>
+                    <i class="fa-solid fa-chart-simple text-indigo-400"></i>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-bold">h1</div>
+                        <div id="matrix-h1" class="text-sm font-bold font-mono text-slate-200">--</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-indigo-950/40 border border-indigo-800/40">
+                        <div class="text-[10px] text-indigo-300 font-bold">h2</div>
+                        <div id="matrix-h2" class="text-sm font-bold font-mono text-indigo-300">--</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-bold">h3</div>
+                        <div id="matrix-h3" class="text-sm font-bold font-mono text-slate-200">--</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-bold">h4</div>
+                        <div id="matrix-h4" class="text-sm font-bold font-mono text-slate-200">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Heuristic Theory Reference Footer -->
+            <div class="p-4 bg-slate-950/90 text-xs space-y-1.5">
+                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-circle-info text-indigo-400"></i>
+                    <span id="theory-title">Heuristic Definition</span>
+                </div>
+                <p id="theory-desc" class="text-slate-400 leading-relaxed text-[11px]">
+                    Select a heuristic above to review its rules, properties, and landscape characteristics.
+                </p>
+            </div>
+
+        </aside>
+    </div>
+
+    <!-- Application Logic Script -->
+    <script>
+        // =========================================================================
+        // 1. DATA STRUCTURES & PROBLEM DEFINITIONS
+        // =========================================================================
+        const ALL_BLOCKS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+        let currentStartState = [['D', 'C', 'B', 'A'], ['F', 'E']];
+        let currentGoalState = [['D', 'C', 'B', 'E', 'A'], ['F']];
+        let activeHeuristic = 'h2'; // 'h1' | 'h2' | 'h3' | 'h4'
+        let landscapeScope = 120;
+
+        // Evaluated State Graph
+        let stateNodes = [];      // Array of state objects { id, name, stacks, scores, x, y, z, category, neighbors }
+        let stateEdges = [];      // Array of edges { fromId, toId, action, delta }
+        let stateLookup = new Map(); // id -> stateNode
+        let hillClimbingSteps = []; // Path of state nodes
+        let activeTrajectoryIdx = 0;
+        let trajectoryTimer = null;
+
+        // Three.js instances
+        let scene, camera, renderer, controls;
+        let surfaceMesh, wireframeMesh, edgesGroup, nodesGroup, trajectoryMesh;
+        let raycaster, mouse;
+        let activeViewMode = '3d'; // '3d' | 'graph' | 'contour'
+        let selectedState = null;
+        let showWireframe = true;
+        let showEdges = true;
+
+        const viewportContainer = document.getElementById('canvas-container');
+
+        // =========================================================================
+        // 2. PARSER & CANONICAL STATE UTILITIES
+        // =========================================================================
+        function canonicalKey(stacks) {
+            // Filter empty stacks and sort stacks lexicographically
+            const valid = stacks.filter(st => st.length > 0);
+            const sorted = valid.map(st => st.join('')).sort();
+            return sorted.join('|');
+        }
+
+        function formatStacksPretty(stacks) {
+            return stacks.map(st => '[' + st.join(', ') + ']').join(', ');
+        }
+
+        function parseStateString(str) {
+            if (!str || !str.trim()) return { success: false, error: 'Empty input string.' };
+            let cleaned = str.trim();
+
+            // Detect multiple stacks by brackets, semicolons, or slashes
+            let stackTokens = [];
+            if (cleaned.includes('[') || cleaned.includes(']')) {
+                const matches = cleaned.match(/\[([A-Za-z,\s]+)\]/g);
+                if (matches) {
+                    stackTokens = matches.map(m => m.replace(/[\[\]]/g, ''));
+                }
+            } else if (cleaned.includes(';')) {
+                stackTokens = cleaned.split(';');
+            } else if (cleaned.includes('/')) {
+                stackTokens = cleaned.split('/');
+            } else if (cleaned.includes(',')) {
+                // If parts have multiple letters (e.g. DCBA, FE)
+                const parts = cleaned.split(',').map(p => p.trim());
+                if (parts.some(p => p.length > 1)) {
+                    stackTokens = parts;
+                } else {
+                    stackTokens = [cleaned];
+                }
+            } else {
+                stackTokens = [cleaned];
+            }
+
+            const parsedStacks = [];
+            const seenBlocks = new Set();
+            const usedList = [];
+
+            for (let token of stackTokens) {
+                const letters = token.match(/[A-Za-z]/g);
+                if (letters && letters.length > 0) {
+                    const uppers = letters.map(l => l.toUpperCase());
+                    parsedStacks.push(uppers);
+                    uppers.forEach(b => {
+                        usedList.push(b);
+                        seenBlocks.add(b);
+                    });
+                }
+            }
+
+            // Must contain exactly A, B, C, D, E, F
+            if (usedList.length !== 6 || seenBlocks.size !== 6) {
+                const missing = ALL_BLOCKS.filter(b => !seenBlocks.has(b));
+                return {
+                    success: false,
+                    error: `Must contain all 6 blocks (A, B, C, D, E, F) exactly once. Found: [${usedList.join(', ')}]. Missing: [${missing.join(', ')}]`
+                };
+            }
+
+            for (let b of seenBlocks) {
+                if (!ALL_BLOCKS.includes(b)) {
+                    return { success: false, error: `Invalid block character: ${b}. Only A..F allowed.` };
+                }
+            }
+
+            return { success: true, stacks: parsedStacks };
+        }
+
+        // =========================================================================
+        // 3. MOVEGEN() SUCCESSOR GENERATOR
+        // =========================================================================
+        function moveGen(stacks) {
+            const successors = [];
+            const numStacks = stacks.length;
+
+            for (let i = 0; i < numStacks; i++) {
+                if (stacks[i].length === 0) continue;
+                const movingBlock = stacks[i][stacks[i].length - 1];
+
+                // 1. Move to table (if stack has more than 1 block)
+                if (stacks[i].length > 1) {
+                    const newStacks = stacks.map(st => [...st]);
+                    newStacks[i].pop();
+                    newStacks.push([movingBlock]);
+                    successors.push({
+                        stacks: newStacks.filter(st => st.length > 0),
+                        action: `Move [${movingBlock}] to table`,
+                        movingBlock: movingBlock,
+                        target: 'table'
+                    });
+                }
+
+                // 2. Move onto top of another stack j
+                for (let j = 0; j < numStacks; j++) {
+                    if (i === j || stacks[j].length === 0) continue;
+                    const targetTop = stacks[j][stacks[j].length - 1];
+
+                    const newStacks = stacks.map(st => [...st]);
+                    newStacks[i].pop();
+                    newStacks[j].push(movingBlock);
+
+                    successors.push({
+                        stacks: newStacks.filter(st => st.length > 0),
+                        action: `Move [${movingBlock}] onto [${targetTop}]`,
+                        movingBlock: movingBlock,
+                        target: targetTop
+                    });
+                }
+            }
+            return successors;
+        }
+
+        // =========================================================================
+        // 4. HEURISTICS CALCULATION ENGINE (h1, h2, h3, h4)
+        // =========================================================================
+        function evaluateState(stacks, goalStacks) {
+            // Goal lookup map: block -> block it rests on ('table' if at level 1)
+            const goalUnder = {};
+            const goalPrefixes = new Set();
+
+            goalStacks.forEach(st => {
+                st.forEach((b, idx) => {
+                    goalUnder[b] = (idx === 0) ? 'table' : st[idx - 1];
+                    goalPrefixes.add(st.slice(0, idx + 1).join(''));
+                });
+            });
+
+            // Detailed block breakdown
+            const blockBreakdown = [];
+
+            // h1: +1 if block is on the correct block/table, otherwise -1
+            let score_h1 = 0;
+            // h2: for block at level n (1-indexed), add n if rests on correct structure below it, otherwise -n
+            let score_h2 = 0;
+            // h4: number of correctly placed blocks in final position (entire structure from table up is correct)
+            let score_h4 = 0;
+
+            stacks.forEach(st => {
+                st.forEach((block, idx) => {
+                    const level = idx + 1; // 1-indexed skyscraper floor
+                    const actualUnder = (idx === 0) ? 'table' : st[idx - 1];
+                    const reqUnder = goalUnder[block];
+
+                    const immediateMatch = (actualUnder === reqUnder);
+                    const subPrefix = st.slice(0, idx + 1).join('');
+                    const structMatch = goalPrefixes.has(subPrefix);
+
+                    // h1 points
+                    const pts_h1 = immediateMatch ? 1 : -1;
+                    score_h1 += pts_h1;
+
+                    // h2 points
+                    const pts_h2 = structMatch ? level : -level;
+                    score_h2 += pts_h2;
+
+                    // h4 check
+                    if (structMatch) {
+                        score_h4 += 1;
+                    }
+
+                    blockBreakdown.push({
+                        block: block,
+                        level: level,
+                        actualUnder: actualUnder,
+                        reqUnder: reqUnder,
+                        immediateMatch: immediateMatch,
+                        structMatch: structMatch,
+                        pts_h1: pts_h1,
+                        pts_h2: pts_h2
+                    });
+                });
+            });
+
+            // h3: number of misplaced blocks (not in final position) = 6 - h4
+            const score_h3 = 6 - score_h4;
+
+            return {
+                scores: {
+                    h1: score_h1,
+                    h2: score_h2,
+                    h3: score_h3,
+                    h4: score_h4
+                },
+                breakdown: blockBreakdown
+            };
+        }
+
+        // =========================================================================
+        // 5. SEARCH SPACE EXPLORATION & LANDSCAPE BUILDER
+        // =========================================================================
+        function generateLandscape() {
+            const startKey = canonicalKey(currentStartState);
+            const goalKey = canonicalKey(currentGoalState);
+
+            stateNodes = [];
+            stateEdges = [];
+            stateLookup.clear();
+
+            // 1. Run BFS exploration to build connected state space
+            const visited = new Map(); // key -> { stacks, dist }
+            const queue = [{ stacks: currentStartState, dist: 0 }];
+            visited.set(startKey, { stacks: currentStartState, dist: 0 });
+
+            // Include Goal in initial frontier if not reached quickly
+            const goalQueue = [{ stacks: currentGoalState, dist: 0 }];
+            const goalVisited = new Map();
+            goalVisited.set(goalKey, { stacks: currentGoalState, dist: 0 });
+
+            // BFS from Start
+            while (queue.length > 0 && visited.size < landscapeScope) {
+                const curr = queue.shift();
+                const currKey = canonicalKey(curr.stacks);
+                const succs = moveGen(curr.stacks);
+
+                for (let succ of succs) {
+                    const sk = canonicalKey(succ.stacks);
+                    if (!visited.has(sk)) {
+                        visited.set(sk, { stacks: succ.stacks, dist: curr.dist + 1 });
+                        if (visited.size < landscapeScope) {
+                            queue.push({ stacks: succ.stacks, dist: curr.dist + 1 });
+                        }
+                    }
+                }
+            }
+
+            // Ensure Goal state is always part of the landscape
+            if (!visited.has(goalKey)) {
+                visited.set(goalKey, { stacks: currentGoalState, dist: 99 });
+            }
+
+            // 2. Instantiate state nodes with full evaluations
+            let idx = 0;
+            visited.forEach((val, key) => {
+                const evalRes = evaluateState(val.stacks, currentGoalState);
+                const isStart = (key === startKey);
+                const isGoal = (key === goalKey);
+
+                let nodeName = `S${idx}`;
+                if (isGoal) nodeName = 'Goal (G)';
+                else if (isStart) nodeName = 'Start (S)';
+
+                const nodeObj = {
+                    id: key,
+                    name: nodeName,
+                    stacks: val.stacks,
+                    dist: val.dist,
+                    scores: evalRes.scores,
+                    score: evalRes.scores[activeHeuristic],
+                    breakdown: evalRes.breakdown,
+                    isStart: isStart,
+                    isGoal: isGoal,
+                    neighbors: [],
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    category: isGoal ? 'goal' : (isStart ? 'start' : 'regular')
+                };
+
+                stateNodes.push(nodeObj);
+                stateLookup.set(key, nodeObj);
+                idx++;
+            });
+
+            // 3. Generate MoveGen edges among the included states
+            const edgeSet = new Set();
+            stateNodes.forEach(node => {
+                const succs = moveGen(node.stacks);
+                succs.forEach(succ => {
+                    const sk = canonicalKey(succ.stacks);
+                    if (stateLookup.has(sk)) {
+                        const targetNode = stateLookup.get(sk);
+                        const edgeKey1 = `${node.id}->${sk}`;
+                        const edgeKey2 = `${sk}->${node.id}`;
+
+                        node.neighbors.push({
+                            target: targetNode,
+                            action: succ.action,
+                            delta: targetNode.score - node.score
+                        });
+
+                        if (!edgeSet.has(edgeKey1) && !edgeSet.has(edgeKey2)) {
+                            edgeSet.add(edgeKey1);
+                            stateEdges.push({
+                                from: node,
+                                to: targetNode,
+                                action: succ.action,
+                                delta: targetNode.score - node.score
+                            });
+                        }
+                    }
+                });
+            });
+
+            // 4. Classify nodes: Local Maxima (Peak), Local Minima (Pit), Plateau
+            classifyLandscapeNodes();
+
+            // 5. Run Steepest Ascent Hill Climbing Trajectory
+            computeHillClimbingTrajectory();
+
+            // 6. Compute 2D Topographic Coordinates (X, Z ground plane)
+            computeLandscapeSpatialLayout();
+
+            // 7. Update HUD metrics
+            updateHUDMetrics();
+
+            // 8. Rebuild Three.js Scene objects
+            rebuildSceneVisuals();
+
+            // 9. Select Start or Goal
+            const defSelect = stateLookup.get(startKey) || stateNodes[0];
+            selectState(defSelect);
+        }
+
+        // =========================================================================
+        // 6. CLASSIFICATION & HILL CLIMBING SIMULATION
+        // =========================================================================
+        function classifyLandscapeNodes() {
+            const isMinimization = (activeHeuristic === 'h3');
+
+            stateNodes.forEach(node => {
+                if (node.isGoal) {
+                    node.category = 'goal';
+                    return;
+                }
+                if (node.isStart) {
+                    node.category = 'start';
+                    return;
+                }
+
+                if (node.neighbors.length === 0) {
+                    node.category = 'regular';
+                    return;
+                }
+
+                let allLower = true;
+                let allHigher = true;
+                let hasEqual = false;
+
+                node.neighbors.forEach(nb => {
+                    const diff = nb.target.score - node.score;
+                    if (isMinimization) {
+                        if (diff <= 0) allHigher = false; // lower is better
+                        if (diff >= 0) allLower = false;
+                        if (diff === 0) hasEqual = true;
+                    } else {
+                        if (diff >= 0) allLower = false;
+                        if (diff <= 0) allHigher = false;
+                        if (diff === 0) hasEqual = true;
+                    }
+                });
+
+                if (allLower) {
+                    node.category = isMinimization ? 'pit' : 'peak'; // Local Trap!
+                } else if (allHigher) {
+                    node.category = isMinimization ? 'peak' : 'pit';
+                } else if (hasEqual) {
+                    node.category = 'plateau';
+                } else {
+                    node.category = 'regular';
+                }
+            });
+        }
+
+        function computeHillClimbingTrajectory() {
+            const startKey = canonicalKey(currentStartState);
+            const goalKey = canonicalKey(currentGoalState);
+            const isMinimization = (activeHeuristic === 'h3');
+
+            hillClimbingSteps = [];
+            const visitedPath = new Set();
+
+            let current = stateLookup.get(startKey);
+            if (!current) return;
+
+            hillClimbingSteps.push({
+                node: current,
+                action: 'Start Configuration',
+                score: current.score,
+                stepNum: 0
+            });
+            visitedPath.add(current.id);
+
+            let maxSteps = 40;
+            while (current && current.id !== goalKey && maxSteps > 0) {
+                maxSteps--;
+                // Get all successors via MoveGen (even those not yet in graph)
+                const succs = moveGen(current.stacks);
+                let bestNode = null;
+                let bestScore = current.score;
+                let bestAction = '';
+
+                succs.forEach(s => {
+                    const sk = canonicalKey(s.stacks);
+                    let targetNode = stateLookup.get(sk);
+                    if (!targetNode) {
+                        // Dynamically create if not in sampled set
+                        const evalRes = evaluateState(s.stacks, currentGoalState);
+                        targetNode = {
+                            id: sk,
+                            name: `T${stateNodes.length}`,
+                            stacks: s.stacks,
+                            scores: evalRes.scores,
+                            score: evalRes.scores[activeHeuristic],
+                            breakdown: evalRes.breakdown,
+                            isStart: false,
+                            isGoal: (sk === goalKey),
+                            neighbors: [],
+                            x: current.x + (Math.random() - 0.5) * 4,
+                            y: 0,
+                            z: current.z + (Math.random() - 0.5) * 4,
+                            category: (sk === goalKey) ? 'goal' : 'regular'
+                        };
+                        stateNodes.push(targetNode);
+                        stateLookup.set(sk, targetNode);
+                    }
+
+                    const sc = targetNode.score;
+                    if (isMinimization) {
+                        if (sc < bestScore) {
+                            bestScore = sc;
+                            bestNode = targetNode;
+                            bestAction = s.action;
+                        }
+                    } else {
+                        if (sc > bestScore) {
+                            bestScore = sc;
+                            bestNode = targetNode;
+                            bestAction = s.action;
+                        }
+                    }
+                });
+
+                if (!bestNode || visitedPath.has(bestNode.id)) {
+                    // Trapped at local peak or plateau!
+                    break;
+                }
+
+                current = bestNode;
+                visitedPath.add(current.id);
+                hillClimbingSteps.push({
+                    node: current,
+                    action: bestAction,
+                    score: current.score,
+                    stepNum: hillClimbingSteps.length
+                });
+            }
+
+            // Update Trajectory UI Banner
+            const reachedGoal = (current && current.id === goalKey);
+            const statusBadge = document.getElementById('trajectory-status-badge');
+            const outcomePill = document.getElementById('trajectory-outcome-pill');
+
+            if (reachedGoal) {
+                statusBadge.className = 'font-bold text-emerald-400 flex items-center space-x-1';
+                statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Goal Reached!</span>';
+                outcomePill.className = 'text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0';
+                outcomePill.innerText = `Optimal Path (${hillClimbingSteps.length - 1} moves)`;
+            } else {
+                statusBadge.className = 'font-bold text-rose-400 flex items-center space-x-1';
+                statusBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span>Trapped at Local Peak!</span>';
+                outcomePill.className = 'text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0';
+                outcomePill.innerText = `Trapped at Step ${hillClimbingSteps.length - 1}`;
+            }
+
+            activeTrajectoryIdx = 0;
+            updateTrajectoryPlayerUI();
+        }
+
+        // =========================================================================
+        // 7. SPATIAL TOPOGRAPHIC LAYOUT (Force-Directed & Metric Gradient)
+        // =========================================================================
+        function computeLandscapeSpatialLayout() {
+            // Ground plane dimension (-15 to 15)
+            // X-axis: Progress towards Goal (based on graph distance and structural similarity)
+            // Z-axis: Lateral spread & penalty divergence
+            // Y-axis (Elevation): Exact Heuristic Score h
+
+            const startKey = canonicalKey(currentStartState);
+            const goalKey = canonicalKey(currentGoalState);
+            const startNode = stateLookup.get(startKey);
+            const goalNode = stateLookup.get(goalKey);
+
+            // Assign base coordinates
+            stateNodes.forEach(node => {
+                // Structural progress (count matching blocks)
+                const evalRes = evaluateState(node.stacks, currentGoalState);
+                const progressRatio = evalRes.scores.h4 / 6.0; // 0 to 1
+
+                // X position: from -14 (start) to +14 (goal)
+                node.x = (progressRatio * 28.0) - 14.0 + (Math.random() - 0.5) * 3.0;
+
+                // Z position: spread based on number of stacks and block tower height
+                const numStacks = node.stacks.length;
+                const maxHeight = Math.max(...node.stacks.map(s => s.length));
+                node.z = (numStacks - 3) * 6.0 + (maxHeight - 3) * 3.0 + (Math.random() - 0.5) * 4.0;
+            });
+
+            if (startNode) { startNode.x = -13.0; startNode.z = 0.0; }
+            if (goalNode) { goalNode.x = 13.0; goalNode.z = 0.0; }
+
+            // Spring relaxation iterations for planar distribution
+            const iterations = 45;
+            for (let iter = 0; iter < iterations; iter++) {
+                // Repulsion between all pairs
+                for (let i = 0; i < stateNodes.length; i++) {
+                    for (let j = i + 1; j < stateNodes.length; j++) {
+                        const n1 = stateNodes[i];
+                        const n2 = stateNodes[j];
+                        const dx = n2.x - n1.x;
+                        const dz = n2.z - n1.z;
+                        const distSq = dx * dx + dz * dz + 0.01;
+                        if (distSq < 36.0) {
+                            const force = 4.0 / distSq;
+                            const fx = (dx / Math.sqrt(distSq)) * force;
+                            const fz = (dz / Math.sqrt(distSq)) * force;
+                            if (!n1.isStart && !n1.isGoal) { n1.x -= fx * 0.2; n1.z -= fz * 0.2; }
+                            if (!n2.isStart && !n2.isGoal) { n2.x += fx * 0.2; n2.z += fz * 0.2; }
+                        }
+                    }
+                }
+
+                // Spring attraction along MoveGen edges
+                stateEdges.forEach(edge => {
+                    const n1 = edge.from;
+                    const n2 = edge.to;
+                    const dx = n2.x - n1.x;
+                    const dz = n2.z - n1.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz) + 0.01;
+                    const springForce = (dist - 3.5) * 0.05;
+                    const fx = (dx / dist) * springForce;
+                    const fz = (dz / dist) * springForce;
+                    if (!n1.isStart && !n1.isGoal) { n1.x += fx; n1.z += fz; }
+                    if (!n2.isStart && !n2.isGoal) { n2.x -= fx; n2.z -= fz; }
+                });
+            }
+
+            // Assign elevation Y directly from heuristic score
+            const isMinimization = (activeHeuristic === 'h3');
+            stateNodes.forEach(node => {
+                node.score = node.scores[activeHeuristic];
+                // In minimization (h3), invert height so goal is top peak
+                let elev = isMinimization ? (6 - node.score) * 2.0 : node.score * 0.8;
+                node.y = elev;
+            });
+        }
+
+        // =========================================================================
+        // 8. THREE.JS 3D SCENE & TOPOGRAPHIC MESH SETUP
+        // =========================================================================
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x030712); // Deep slate/black
+
+            camera = new THREE.PerspectiveCamera(45, viewportContainer.clientWidth / viewportContainer.clientHeight, 0.1, 1000);
+            camera.position.set(22, 24, 28);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            viewportContainer.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.02; // Keep above ground
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(25, 40, 25);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x6366f1, 1.4, 60);
+            pointLight.position.set(0, 15, 0);
+            scene.add(pointLight);
+
+            // Ground grid helper
+            const grid = new THREE.GridHelper(36, 36, 0x334155, 0x111827);
+            grid.position.y = -8.5;
+            scene.add(grid);
+
+            // Raycaster & mouse
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Groups
+            nodesGroup = new THREE.Group();
+            edgesGroup = new THREE.Group();
+            scene.add(nodesGroup);
+            scene.add(edgesGroup);
+
+            // Listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('mousemove', onPointerMove);
+            renderer.domElement.addEventListener('click', onPointerClick);
+
+            // Build initial landscape
+            generateLandscape();
+
+            animate();
+        }
+
+        // =========================================================================
+        // 9. REBUILD 3D VISUALS (TERRAIN, NODES, EDGES, TRAJECTORY)
+        // =========================================================================
+        function rebuildSceneVisuals() {
+            // 1. Remove old meshes
+            if (surfaceMesh) { scene.remove(surfaceMesh); surfaceMesh.geometry.dispose(); surfaceMesh.material.dispose(); }
+            if (wireframeMesh) { scene.remove(wireframeMesh); wireframeMesh.geometry.dispose(); wireframeMesh.material.dispose(); }
+            if (trajectoryMesh) { scene.remove(trajectoryMesh); trajectoryMesh.geometry.dispose(); trajectoryMesh.material.dispose(); }
+
+            while (nodesGroup.children.length > 0) {
+                const c = nodesGroup.children.pop();
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) c.material.dispose();
+            }
+
+            while (edgesGroup.children.length > 0) {
+                const c = edgesGroup.children.pop();
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) c.material.dispose();
+            }
+
+            // 2. Build Continuous Topographic Surface Mesh via IDW (Inverse Distance Weighting)
+            buildTopographicSurfaceMesh();
+
+            // 3. Build State Spheres & Glowing Rings
+            buildStateNodes3D();
+
+            // 4. Build MoveGen Transitions
+            buildMoveGenEdges3D();
+
+            // 5. Build Hill Climbing Glowing Path
+            buildTrajectoryTrail3D();
+        }
+
+        function interpolateElevation(x, z) {
+            // Inverse Distance Weighting interpolation of heuristic elevations
+            let num = 0;
+            let den = 0;
+            const p = 2.2;
+            const eps = 0.001;
+
+            for (let i = 0; i < stateNodes.length; i++) {
+                const n = stateNodes[i];
+                const dx = x - n.x;
+                const dz = z - n.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist < 0.1) return n.y;
+
+                const weight = 1.0 / Math.pow(dist + eps, p);
+                num += weight * n.y;
+                den += weight;
+            }
+            return den > 0 ? (num / den) : 0;
+        }
+
+        function buildTopographicSurfaceMesh() {
+            const size = 32;
+            const segments = 48;
+            const geom = new THREE.PlaneGeometry(size, size, segments, segments);
+            geom.rotateX(-Math.PI / 2); // Lay flat on X-Z plane
+
+            const posAttr = geom.attributes.position;
+            const colors = [];
+
+            // Find min/max elevations for color gradient
+            let minY = Infinity;
+            let maxY = -Infinity;
+            stateNodes.forEach(n => {
+                if (n.y < minY) minY = n.y;
+                if (n.y > maxY) maxY = n.y;
+            });
+            if (minY === maxY) { minY -= 1; maxY += 1; }
+
+            for (let i = 0; i < posAttr.count; i++) {
+                const vx = posAttr.getX(i);
+                const vz = posAttr.getZ(i);
+
+                const vy = interpolateElevation(vx, vz);
+                posAttr.setY(i, vy);
+
+                // Elevation color interpolation (Emerald -> Amber -> Rose/Purple)
+                const norm = THREE.MathUtils.clamp((vy - minY) / (maxY - minY), 0, 1);
+                const col = new THREE.Color();
+
+                if (norm > 0.65) {
+                    // High peak / Optimal: Emerald green
+                    col.setHSL(0.38 - (norm - 0.65) * 0.25, 0.85, 0.45);
+                } else if (norm > 0.35) {
+                    // Plateau / Mid: Amber / Orange
+                    col.setHSL(0.12, 0.9, 0.48);
+                } else {
+                    // Low valley / Penalty: Deep Rose / Crimson
+                    col.setHSL(0.98, 0.85, 0.4 + norm * 0.15);
+                }
+                colors.push(col.r, col.g, col.b);
+            }
+
+            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geom.computeVertexNormals();
+
+            const mat = new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.35,
+                metalness: 0.15,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.92
+            });
+
+            surfaceMesh = new THREE.Mesh(geom, mat);
+            surfaceMesh.receiveShadow = true;
+            surfaceMesh.visible = (activeViewMode !== 'graph');
+            scene.add(surfaceMesh);
+
+            // Wireframe mesh overlay
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: 0x475569,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.22
+            });
+            wireframeMesh = new THREE.Mesh(geom, wireMat);
+            wireframeMesh.position.y += 0.02;
+            wireframeMesh.visible = (activeViewMode !== 'graph' && showWireframe);
+            scene.add(wireframeMesh);
+        }
+
+        function buildStateNodes3D() {
+            stateNodes.forEach(node => {
+                const isAnchor = (node.isGoal || node.isStart || node.category === 'peak');
+                const radius = node.isGoal ? 0.75 : (node.isStart ? 0.65 : (node.category === 'peak' ? 0.6 : 0.42));
+
+                const sphereGeom = new THREE.SphereGeometry(radius, 28, 28);
+                let colHex = 0x6366f1; // Default indigo
+
+                if (node.isGoal) colHex = 0x10b981; // Emerald Gold
+                else if (node.isStart) colHex = 0x0ea5e9; // Sky Blue
+                else if (node.category === 'peak') colHex = 0xf59e0b; // Amber Peak Trap
+                else if (node.category === 'pit') colHex = 0xf43f5e; // Rose Valley
+                else if (node.score > 4) colHex = 0x10b981;
+                else if (node.score < 0) colHex = 0xf43f5e;
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: colHex,
+                    emissive: colHex,
+                    emissiveIntensity: isAnchor ? 0.6 : 0.2,
+                    roughness: 0.2,
+                    metalness: 0.5
+                });
+
+                const mesh = new THREE.Mesh(sphereGeom, mat);
+                mesh.position.set(node.x, node.y + radius + 0.05, node.z);
+                mesh.castShadow = true;
+                mesh.userData = node;
+                node.mesh = mesh;
+                nodesGroup.add(mesh);
+
+                // Glowing rings for key anchors
+                if (isAnchor) {
+                    const ringGeom = new THREE.RingGeometry(radius + 0.15, radius + 0.35, 32);
+                    ringGeom.rotateX(-Math.PI / 2);
+                    const ringMat = new THREE.MeshBasicMaterial({
+                        color: colHex,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.75
+                    });
+                    const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+                    ringMesh.position.set(node.x, node.y + 0.05, node.z);
+                    nodesGroup.add(ringMesh);
+                }
+            });
+        }
+
+        function buildMoveGenEdges3D() {
+            if (!showEdges) return;
+
+            stateEdges.forEach(edge => {
+                const p1 = new THREE.Vector3(edge.from.x, edge.from.y + 0.45, edge.from.z);
+                const p2 = new THREE.Vector3(edge.to.x, edge.to.y + 0.45, edge.to.z);
+
+                const geom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+
+                // Color by delta (uphill vs downhill)
+                let edgeColor = 0x475569;
+                if (edge.delta > 0) edgeColor = 0x10b981; // Improving ascent
+                else if (edge.delta < 0) edgeColor = 0xf43f5e; // Worsening descent
+                else edgeColor = 0xf59e0b; // Flat plateau
+
+                const mat = new THREE.LineBasicMaterial({
+                    color: edgeColor,
+                    transparent: true,
+                    opacity: 0.35
+                });
+
+                const line = new THREE.Line(geom, mat);
+                edgesGroup.add(line);
+            });
+        }
+
+        function buildTrajectoryTrail3D() {
+            if (hillClimbingSteps.length < 2) return;
+
+            const curvePoints = hillClimbingSteps.map(step => {
+                return new THREE.Vector3(step.node.x, step.node.y + 0.7, step.node.z);
+            });
+
+            const curve = new THREE.CatmullRomCurve3(curvePoints);
+            const tubeGeom = new THREE.TubeGeometry(curve, 64, 0.12, 8, false);
+            const tubeMat = new THREE.MeshStandardMaterial({
+                color: 0x22d3ee, // Bright cyan
+                emissive: 0x06b6d4,
+                emissiveIntensity: 0.8,
+                roughness: 0.2
+            });
+
+            trajectoryMesh = new THREE.Mesh(tubeGeom, tubeMat);
+            scene.add(trajectoryMesh);
+        }
+
+        // =========================================================================
+        // 10. INTERACTION, SELECTION & SKYSCRAPER RENDERER
+        // =========================================================================
+        function onPointerMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodesGroup.children);
+
+            const tooltip = document.getElementById('hover-tooltip');
+            if (intersects.length > 0) {
+                const node = intersects[0].object.userData;
+                if (!node || !node.name) {
+                    tooltip.style.opacity = '0';
+                    return;
+                }
+
+                document.getElementById('tooltip-title').innerText = node.name;
+                document.getElementById('tooltip-category').innerText = node.category.toUpperCase();
+                document.getElementById('tooltip-stacks').innerText = formatStacksPretty(node.stacks);
+                document.getElementById('tooltip-score').innerText = `${activeHeuristic.toUpperCase()} Score: ${node.score > 0 ? '+' : ''}${node.score}`;
+
+                tooltip.style.left = `${event.clientX + 14}px`;
+                tooltip.style.top = `${event.clientY + 14}px`;
+                tooltip.style.opacity = '1';
+                document.body.style.cursor = 'pointer';
+            } else {
+                tooltip.style.opacity = '0';
+                document.body.style.cursor = 'auto';
+            }
+        }
+
+        function onPointerClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodesGroup.children);
+
+            if (intersects.length > 0) {
+                const node = intersects[0].object.userData;
+                if (node && node.name) {
+                    selectState(node);
+                }
+            }
+        }
+
+        function selectState(node) {
+            selectedState = node;
+
+            // Highlight Tag
+            document.getElementById('selected-state-tag').innerText = node.name;
+
+            // Score and badge
+            const scoreText = document.getElementById('inspector-score-text');
+            const scoreBadge = document.getElementById('inspector-badge');
+            const labelText = document.getElementById('inspector-heuristic-label');
+
+            labelText.innerText = `Total ${activeHeuristic.toUpperCase()} Evaluation`;
+            scoreText.innerText = `${node.score > 0 ? '+' : ''}${node.score}`;
+
+            if (node.isGoal) {
+                scoreBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                scoreBadge.innerText = 'Goal (Global Optimum)';
+            } else if (node.isStart) {
+                scoreBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40';
+                scoreBadge.innerText = 'Start State';
+            } else if (node.category === 'peak') {
+                scoreBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                scoreBadge.innerText = 'Local Maximum (Trap)';
+            } else if (node.category === 'plateau') {
+                scoreBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-700 text-slate-300 border border-slate-600';
+                scoreBadge.innerText = 'Plateau Zone';
+            } else {
+                scoreBadge.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+                scoreBadge.innerText = 'Interior State';
+            }
+
+            // Render Skyscraper Towers
+            renderSkyscraperBlocks(node.stacks, node.breakdown);
+
+            // Render Floors Breakdown Table
+            renderFloorsBreakdownTable(node.breakdown);
+
+            // Render MoveGen Neighbors
+            renderMoveGenNeighbors(node);
+
+            // Update 4 Heuristics Matrix
+            document.getElementById('matrix-h1').innerText = (node.scores.h1 > 0 ? '+' : '') + node.scores.h1;
+            document.getElementById('matrix-h2').innerText = (node.scores.h2 > 0 ? '+' : '') + node.scores.h2;
+            document.getElementById('matrix-h3').innerText = node.scores.h3;
+            document.getElementById('matrix-h4').innerText = node.scores.h4;
+        }
+
+        function renderSkyscraperBlocks(stacks, breakdown) {
+            const container = document.getElementById('skyscraper-render-area');
+            container.innerHTML = '';
+
+            stacks.forEach((st, stIdx) => {
+                if (st.length === 0) return;
+
+                const stackCol = document.createElement('div');
+                stackCol.className = 'flex flex-col-reverse items-center gap-1.5';
+
+                st.forEach((blockLetter, idx) => {
+                    const level = idx + 1;
+                    const itemData = breakdown.find(b => b.block === blockLetter);
+
+                    const blockEl = document.createElement('div');
+                    blockEl.className = `w-11 h-11 rounded-xl font-display font-extrabold text-xs flex flex-col items-center justify-center shadow-lg transition-transform hover:scale-105 border-2 text-white relative block-${blockLetter}`;
+
+                    // Floor badge
+                    const badge = document.createElement('span');
+                    badge.className = 'floor-badge absolute top-0.5 left-1 text-[8px] bg-black/40 text-slate-200';
+                    badge.innerText = `F${level}`;
+
+                    // Correct/Wrong Status icon
+                    const statusIcon = document.createElement('span');
+                    statusIcon.className = 'absolute top-0.5 right-1 text-[8px]';
+                    const isCorrect = (activeHeuristic === 'h1') ? itemData.immediateMatch : itemData.structMatch;
+                    statusIcon.innerHTML = isCorrect ? '✓' : '✗';
+                    statusIcon.style.color = isCorrect ? '#34d399' : '#f87171';
+
+                    const letterEl = document.createElement('span');
+                    letterEl.className = 'text-sm leading-none mt-1';
+                    letterEl.innerText = blockLetter;
+
+                    blockEl.appendChild(badge);
+                    blockEl.appendChild(statusIcon);
+                    blockEl.appendChild(letterEl);
+
+                    stackCol.appendChild(blockEl);
+                });
+
+                container.appendChild(stackCol);
+            });
+        }
+
+        function renderFloorsBreakdownTable(breakdown) {
+            const tbody = document.getElementById('breakdown-tbody');
+            tbody.innerHTML = '';
+
+            let formulaTerms = [];
+
+            breakdown.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-800/40 transition';
+
+                const isCorrect = (activeHeuristic === 'h1') ? item.immediateMatch : item.structMatch;
+                const statusTag = isCorrect
+                    ? `<span class="text-emerald-400 font-bold">✓ Correct</span>`
+                    : `<span class="text-rose-400 font-bold">✗ Misplaced</span>`;
+
+                let pts = 0;
+                if (activeHeuristic === 'h1') pts = item.pts_h1;
+                else if (activeHeuristic === 'h2') pts = item.pts_h2;
+                else if (activeHeuristic === 'h3') pts = item.structMatch ? 0 : 1;
+                else if (activeHeuristic === 'h4') pts = item.structMatch ? 1 : 0;
+
+                const ptsTag = (pts > 0)
+                    ? `<span class="text-emerald-400 font-bold">+${pts}</span>`
+                    : (pts < 0 ? `<span class="text-rose-400 font-bold">${pts}</span>` : `<span class="text-slate-400 font-bold">0</span>`);
+
+                formulaTerms.push(pts > 0 ? `+${pts}` : `${pts}`);
+
+                row.innerHTML = `
+                    <td class="p-2 font-bold text-slate-200 flex items-center space-x-1.5">
+                        <span class="w-3.5 h-3.5 rounded-md flex items-center justify-center text-[9px] font-bold block-${item.block}">${item.block}</span>
+                    </td>
+                    <td class="p-2 text-center text-slate-300 font-bold">F${item.level}</td>
+                    <td class="p-2 text-slate-400">${item.actualUnder}</td>
+                    <td class="p-2 text-center">${statusTag}</td>
+                    <td class="p-2 text-right">${ptsTag}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('math-formula-text').innerText = formulaTerms.join(' ') + ` = ${selectedState.score}`;
+        }
+
+        function renderMoveGenNeighbors(node) {
+            const list = document.getElementById('movegen-neighbors-list');
+            const badge = document.getElementById('movegen-count-badge');
+            list.innerHTML = '';
+
+            const succs = moveGen(node.stacks);
+            badge.innerText = `${succs.length} moves`;
+
+            succs.forEach(s => {
+                const sk = canonicalKey(s.stacks);
+                const evalRes = evaluateState(s.stacks, currentGoalState);
+                const sc = evalRes.scores[activeHeuristic];
+                const delta = sc - node.score;
+
+                const row = document.createElement('div');
+                row.className = 'p-2 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 cursor-pointer transition flex items-center justify-between text-xs';
+                row.onclick = () => {
+                    let targetNode = stateLookup.get(sk);
+                    if (targetNode) selectState(targetNode);
+                };
+
+                let deltaTag = `<span class="text-slate-400 font-mono font-bold">0</span>`;
+                if (delta > 0) deltaTag = `<span class="text-emerald-400 font-mono font-bold">+${delta}</span>`;
+                else if (delta < 0) deltaTag = `<span class="text-rose-400 font-mono font-bold">${delta}</span>`;
+
+                row.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-arrow-right text-[10px] text-indigo-400"></i>
+                        <span class="text-slate-200 font-medium">${s.action}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-400 font-mono text-[11px]">${sc > 0 ? '+' : ''}${sc}</span>
+                        ${deltaTag}
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        // =========================================================================
+        // 11. TRAJECTORY PLAYER CONTROLS
+        // =========================================================================
+        function updateTrajectoryPlayerUI() {
+            const stepText = document.getElementById('trajectory-step-text');
+            const progressBar = document.getElementById('trajectory-progress-bar');
+
+            if (hillClimbingSteps.length === 0) {
+                stepText.innerText = '0 / 0';
+                progressBar.style.width = '0%';
+                return;
+            }
+
+            stepText.innerText = `Step ${activeTrajectoryIdx} / ${hillClimbingSteps.length - 1}`;
+            const pct = (activeTrajectoryIdx / Math.max(1, hillClimbingSteps.length - 1)) * 100;
+            progressBar.style.width = `${pct}%`;
+
+            const currentStep = hillClimbingSteps[activeTrajectoryIdx];
+            if (currentStep) {
+                selectState(currentStep.node);
+                focusCameraOnPoint(currentStep.node.x, currentStep.node.y, currentStep.node.z);
+            }
+        }
+
+        function stepTrajectory(dir) {
+            if (hillClimbingSteps.length === 0) return;
+            activeTrajectoryIdx = Math.max(0, Math.min(hillClimbingSteps.length - 1, activeTrajectoryIdx + dir));
+            updateTrajectoryPlayerUI();
+        }
+
+        function togglePlayTrajectory() {
+            const btn = document.getElementById('btn-play-trajectory');
+            if (trajectoryTimer) {
+                clearInterval(trajectoryTimer);
+                trajectoryTimer = null;
+                btn.innerHTML = '<i class="fa-solid fa-play text-xs"></i>';
+            } else {
+                if (activeTrajectoryIdx >= hillClimbingSteps.length - 1) {
+                    activeTrajectoryIdx = 0;
+                }
+                btn.innerHTML = '<i class="fa-solid fa-pause text-xs"></i>';
+                trajectoryTimer = setInterval(() => {
+                    if (activeTrajectoryIdx < hillClimbingSteps.length - 1) {
+                        activeTrajectoryIdx++;
+                        updateTrajectoryPlayerUI();
+                    } else {
+                        clearInterval(trajectoryTimer);
+                        trajectoryTimer = null;
+                        btn.innerHTML = '<i class="fa-solid fa-play text-xs"></i>';
+                    }
+                }, 900);
+            }
+        }
+
+        function triggerHillClimbing() {
+            computeHillClimbingTrajectory();
+            activeTrajectoryIdx = 0;
+            updateTrajectoryPlayerUI();
+            togglePlayTrajectory();
+        }
+
+        // =========================================================================
+        // 12. CAMERA FOCUS & NAVIGATION
+        // =========================================================================
+        function focusCameraOnPoint(px, py, pz) {
+            const targetPos = new THREE.Vector3(px + 8, py + 10, pz + 12);
+            const targetLook = new THREE.Vector3(px, py, pz);
+
+            let t = 0;
+            const startPos = camera.position.clone();
+            const startLook = controls.target.clone();
+
+            function anim() {
+                t += 0.06;
+                camera.position.lerpVectors(startPos, targetPos, t);
+                controls.target.lerpVectors(startLook, targetLook, t);
+                controls.update();
+                if (t < 1) requestAnimationFrame(anim);
+            }
+            anim();
+        }
+
+        function focusKeyAnchor(anchorType) {
+            let targetNode = null;
+            if (anchorType === 'goal') targetNode = stateNodes.find(n => n.isGoal);
+            else if (anchorType === 'start') targetNode = stateNodes.find(n => n.isStart);
+            else if (anchorType === 'peak') targetNode = stateNodes.find(n => n.category === 'peak') || stateNodes.find(n => n.isGoal);
+            else if (anchorType === 'pit') {
+                let minNode = stateNodes[0];
+                stateNodes.forEach(n => { if (n.score < minNode.score) minNode = n; });
+                targetNode = minNode;
+            }
+
+            if (targetNode) {
+                selectState(targetNode);
+                focusCameraOnPoint(targetNode.x, targetNode.y, targetNode.z);
+            }
+        }
+
+        function resetCamera() {
+            switchViewMode(activeViewMode);
+        }
+
+        function switchViewMode(mode) {
+            activeViewMode = mode;
+
+            ['3d', 'graph', 'contour'].forEach(m => {
+                const btn = document.getElementById(`btn-view-${m}`);
+                if (m === mode) {
+                    btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition flex items-center space-x-1.5 shadow-md";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5";
+                }
+            });
+
+            const contourCanvas = document.getElementById('contour-canvas');
+
+            if (mode === '3d') {
+                contourCanvas.classList.add('hidden');
+                renderer.domElement.style.display = 'block';
+                camera.position.set(22, 24, 28);
+                controls.target.set(0, 0, 0);
+                if (surfaceMesh) surfaceMesh.visible = true;
+                if (wireframeMesh) wireframeMesh.visible = showWireframe;
+            } else if (mode === 'graph') {
+                contourCanvas.classList.add('hidden');
+                renderer.domElement.style.display = 'block';
+                camera.position.set(0, 20, 32);
+                controls.target.set(0, 0, 0);
+                if (surfaceMesh) surfaceMesh.visible = false;
+                if (wireframeMesh) wireframeMesh.visible = false;
+            } else if (mode === 'contour') {
+                // Render high-contrast 2D contour map on canvas
+                contourCanvas.classList.remove('hidden');
+                render2DContourMap();
+            }
+            controls.update();
+        }
+
+        function toggleWireframe() {
+            showWireframe = !showWireframe;
+            if (wireframeMesh) wireframeMesh.visible = (activeViewMode !== 'graph' && showWireframe);
+            document.getElementById('toggle-wireframe-btn').classList.toggle('text-indigo-400', showWireframe);
+        }
+
+        function toggleEdges() {
+            showEdges = !showEdges;
+            edgesGroup.visible = showEdges;
+            document.getElementById('toggle-edges-btn').classList.toggle('text-indigo-400', showEdges);
+        }
+
+        // =========================================================================
+        // 13. 2D CONTOUR MAP RENDERER
+        // =========================================================================
+        function render2DContourMap() {
+            const canvas = document.getElementById('contour-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.fillStyle = '#030712';
+            ctx.fillRect(0, 0, w, h);
+
+            // Compute bounds
+            let minX = -16, maxX = 16, minZ = -16, maxZ = 16;
+            const toCanvasX = (x) => ((x - minX) / (maxX - minX)) * (w - 120) + 60;
+            const toCanvasY = (z) => ((z - minZ) / (maxZ - minZ)) * (h - 120) + 60;
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+            ctx.lineWidth = 1;
+            for (let gx = -15; gx <= 15; gx += 5) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(gx), toCanvasY(-15));
+                ctx.lineTo(toCanvasX(gx), toCanvasY(15));
+                ctx.stroke();
+            }
+            for (let gz = -15; gz <= 15; gz += 5) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(-15), toCanvasY(gz));
+                ctx.lineTo(toCanvasX(15), toCanvasY(gz));
+                ctx.stroke();
+            }
+
+            // Draw edges
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
+            ctx.lineWidth = 1.5;
+            stateEdges.forEach(edge => {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(edge.from.x), toCanvasY(edge.from.z));
+                ctx.lineTo(toCanvasX(edge.to.x), toCanvasY(edge.to.z));
+                ctx.stroke();
+            });
+
+            // Draw Hill Climbing Trajectory
+            if (hillClimbingSteps.length > 1) {
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 3.5;
+                ctx.beginPath();
+                hillClimbingSteps.forEach((step, idx) => {
+                    const cx = toCanvasX(step.node.x);
+                    const cy = toCanvasY(step.node.z);
+                    if (idx === 0) ctx.moveTo(cx, cy);
+                    else ctx.lineTo(cx, cy);
+                });
+                ctx.stroke();
+            }
+
+            // Draw State Nodes
+            stateNodes.forEach(node => {
+                const cx = toCanvasX(node.x);
+                const cy = toCanvasY(node.z);
+
+                ctx.beginPath();
+                const radius = node.isGoal ? 10 : (node.isStart ? 8 : (node.category === 'peak' ? 8 : 5));
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+
+                if (node.isGoal) ctx.fillStyle = '#10b981';
+                else if (node.isStart) ctx.fillStyle = '#0ea5e9';
+                else if (node.category === 'peak') ctx.fillStyle = '#f59e0b';
+                else if (node.score > 4) ctx.fillStyle = '#34d399';
+                else if (node.score < 0) ctx.fillStyle = '#f43f5e';
+                else ctx.fillStyle = '#6366f1';
+
+                ctx.fill();
+                ctx.strokeStyle = '#030712';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Labels for anchors
+                if (node.isGoal || node.isStart || node.category === 'peak') {
+                    ctx.fillStyle = '#f1f5f9';
+                    ctx.font = 'bold 11px Inter, sans-serif';
+                    ctx.fillText(node.name, cx + radius + 4, cy + 4);
+                }
+            });
+        }
+
+        // =========================================================================
+        // 14. PRESETS, INPUT VALIDATION & CONFIGURATION
+        // =========================================================================
+        const PRESETS = {
+            lecture: {
+                start: '[[D, C, B, A], [F, E]]',
+                goal: '[[D, C, B, E, A], [F]]',
+                heuristic: 'h2'
+            },
+            trap: {
+                start: '[[D, C, B, A], [F, E]]',
+                goal: '[[D, C, B, E, A], [F]]',
+                heuristic: 'h1'
+            },
+            invert: {
+                start: '[[A, B, C, D, E, F]]',
+                goal: '[[F, E, D, C, B, A]]',
+                heuristic: 'h2'
+            },
+            table: {
+                start: '[[A], [B], [C], [D], [E], [F]]',
+                goal: '[[A, B, C, D, E, F]]',
+                heuristic: 'h2'
+            }
+        };
+
+        function loadPreset(key) {
+            const p = PRESETS[key];
+            if (!p) return;
+
+            document.getElementById('input-start-state').value = p.start;
+            document.getElementById('input-goal-state').value = p.goal;
+            selectHeuristic(p.heuristic);
+            generateLandscapeFromInputs();
+        }
+
+        function generateRandomConfig() {
+            // Shuffle A..F
+            const shuffled = [...ALL_BLOCKS].sort(() => Math.random() - 0.5);
+            // Random partition into 1..4 stacks
+            const numStacks = Math.floor(Math.random() * 3) + 2;
+            const stacks = Array.from({ length: numStacks }, () => []);
+
+            shuffled.forEach((b, idx) => {
+                stacks[idx % numStacks].push(b);
+            });
+
+            document.getElementById('input-start-state').value = formatStacksPretty(stacks.filter(s => s.length > 0));
+            generateLandscapeFromInputs();
+        }
+
+        function selectHeuristic(h) {
+            activeHeuristic = h;
+            ['h1', 'h2', 'h3', 'h4'].forEach(opt => {
+                const btn = document.getElementById(`opt-${opt}`);
+                if (opt === h) {
+                    btn.className = "p-2 rounded-lg border border-indigo-500 bg-indigo-600/20 text-left transition text-xs font-medium";
+                } else {
+                    btn.className = "p-2 rounded-lg border border-slate-700 bg-slate-950 hover:border-indigo-500 text-left transition text-xs font-medium";
+                }
+            });
+
+            const pill = document.getElementById('active-heuristic-pill');
+            const descriptions = {
+                h1: 'h1: Local Support (+1/-1)',
+                h2: 'h2: Level Structure (+n/-n)',
+                h3: 'h3: Misplaced Blocks (Min)',
+                h4: 'h4: Correct Blocks (Max)'
+            };
+            pill.innerText = descriptions[h];
+
+            updateTheorySection(h);
+        }
+
+        function updateTheorySection(h) {
+            const titleEl = document.getElementById('theory-title');
+            const descEl = document.getElementById('theory-desc');
+
+            const content = {
+                h1: {
+                    title: 'h1: Immediate Support Heuristic',
+                    desc: 'Evaluates each block locally: +1 if resting on the exact block or table specified in Goal, otherwise -1. Vulnerable to deceptive local peaks when a block is placed on the correct block, but that lower block is on the wrong foundation!'
+                },
+                h2: {
+                    title: 'h2: Level-Weighted Skyscraper Heuristic',
+                    desc: 'For a block at skyscraper level n (1-indexed from table): adds +n if resting on a 100% correct substructure down to the table, otherwise subtracts -n. Deep foundational errors are heavily penalized (-4, -5), guiding search away from premature towers!'
+                },
+                h3: {
+                    title: 'h3: Number of Misplaced Blocks',
+                    desc: 'Counts blocks not yet in their final position. Classical distance-to-goal metric used in A* search. Goal state has h3 = 0 (minimization). Forms plateaus across states where single moves do not settle a block permanently.'
+                },
+                h4: {
+                    title: 'h4: Blocks in Final Position',
+                    desc: 'Counts blocks settled in their final destination (entire tower below matches goal). Goal state has h4 = 6. Maximization metric complementary to h3 (h3 + h4 = 6 always).'
+                }
+            };
+
+            titleEl.innerText = content[h].title;
+            descEl.innerText = content[h].desc;
+        }
+
+        function updateScopeLabel(val) {
+            landscapeScope = parseInt(val);
+            document.getElementById('scope-label').innerText = `${val} states`;
+        }
+
+        function toggleConfigDrawer() {
+            const drawer = document.getElementById('config-drawer');
+            drawer.classList.toggle('-translate-y-full');
+        }
+
+        function generateLandscapeFromInputs() {
+            const startStr = document.getElementById('input-start-state').value;
+            const goalStr = document.getElementById('input-goal-state').value;
+            const errBanner = document.getElementById('input-error-banner');
+            const errText = document.getElementById('input-error-text');
+
+            const startRes = parseStateString(startStr);
+            if (!startRes.success) {
+                errBanner.classList.remove('hidden');
+                errText.innerText = `Start State Error: ${startRes.error}`;
+                return;
+            }
+
+            const goalRes = parseStateString(goalStr);
+            if (!goalRes.success) {
+                errBanner.classList.remove('hidden');
+                errText.innerText = `Goal State Error: ${goalRes.error}`;
+                return;
+            }
+
+            errBanner.classList.add('hidden');
+            currentStartState = startRes.stacks;
+            currentGoalState = goalRes.stacks;
+
+            // Generate full landscape
+            generateLandscape();
+
+            // Close config drawer if open
+            document.getElementById('config-drawer').classList.add('-translate-y-full');
+        }
+
+        function updateHUDMetrics() {
+            const startKey = canonicalKey(currentStartState);
+            const goalKey = canonicalKey(currentGoalState);
+
+            const startNode = stateLookup.get(startKey);
+            const goalNode = stateLookup.get(goalKey);
+
+            if (startNode) {
+                document.getElementById('hud-score-start').innerText = (startNode.score > 0 ? '+' : '') + startNode.score;
+            }
+            if (goalNode) {
+                document.getElementById('hud-score-goal').innerText = (goalNode.score > 0 ? '+' : '') + goalNode.score;
+            }
+
+            // Find peak and pit
+            let maxPeak = null;
+            let minPit = null;
+            stateNodes.forEach(n => {
+                if (!n.isGoal && n.category === 'peak') {
+                    if (!maxPeak || n.score > maxPeak.score) maxPeak = n;
+                }
+                if (!minPit || n.score < minPit.score) minPit = n;
+            });
+
+            const peakBtn = document.getElementById('btn-anchor-peak');
+            if (maxPeak) {
+                peakBtn.classList.remove('hidden');
+                document.getElementById('hud-score-peak').innerText = (maxPeak.score > 0 ? '+' : '') + maxPeak.score;
+            } else {
+                document.getElementById('hud-score-peak').innerText = 'None';
+            }
+
+            if (minPit) {
+                document.getElementById('hud-score-pit').innerText = (minPit.score > 0 ? '+' : '') + minPit.score;
+            }
+        }
+
+        // =========================================================================
+        // 15. WINDOW RESIZE & ANIMATION LOOP
+        // =========================================================================
+        function onWindowResize() {
+            camera.aspect = viewportContainer.clientWidth / viewportContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+
+            if (activeViewMode === 'contour') {
+                render2DContourMap();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Subtle rotation of anchor node pulses
+            nodesGroup.children.forEach(child => {
+                if (child.isMesh && child.geometry.type === 'RingGeometry') {
+                    child.rotation.z += 0.015;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Initialize on page load
+        window.onload = function () {
+            selectHeuristic('h2');
+            initScene();
+        };
+    </script>
+</body>
+
+</html>

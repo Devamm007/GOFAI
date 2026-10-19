@@ -11,10 +11,12 @@ export interface CustomNodeData extends Record<string, unknown> {
   successors?: string[]
   isSelected?: boolean
   depth?: number | null
+  heuristicVal?: number | null
 }
 
 export const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
-  const { label, status, isStart, isGoal, badgeText, successors, isSelected, depth } = data
+  const { label, status, isStart, isGoal, badgeText, successors, isSelected, depth, heuristicVal } = data
+
 
   // Determine state class and icons for non-color accessibility cues
   let statusClass = 'node-idle'
@@ -89,8 +91,8 @@ export const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
         <span style={{ fontSize: 18, fontWeight: 800 }}>{label}</span>
       </div>
 
-      {/* Depth indicator if present */}
-      {depth !== undefined && depth !== null && (
+      {/* Depth and/or Heuristic indicator if present */}
+      {((depth !== undefined && depth !== null) || (heuristicVal !== undefined && heuristicVal !== null)) && (
         <span
           style={{
             position: 'absolute',
@@ -102,10 +104,12 @@ export const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
             padding: '1px 4px',
             borderRadius: 4,
             border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#cbd5e1',
+            color: heuristicVal !== null && heuristicVal !== undefined ? '#c084fc' : '#cbd5e1',
           }}
         >
-          d:{depth}
+          {depth !== null && depth !== undefined ? `d:${depth}` : ''}
+          {depth !== null && depth !== undefined && heuristicVal !== null && heuristicVal !== undefined ? ' ' : ''}
+          {heuristicVal !== null && heuristicVal !== undefined ? `h:${heuristicVal}` : ''}
         </span>
       )}
 

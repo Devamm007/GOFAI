@@ -60,7 +60,7 @@ export const AppShell: React.FC = () => {
         {route === 'visualizer' && (
           <App
             initialAlgorithm={params.algo}
-            onAlgorithmChange={(algo) => navigate('visualizer', { algo })}
+            onAlgorithmChange={(algo: string) => navigate('visualizer', { algo })}
             onBackToOverview={() => navigate('landing')}
             onOpenDrawer={() => setIsDrawerOpen(true)}
           />

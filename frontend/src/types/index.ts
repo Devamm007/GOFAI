@@ -72,3 +72,30 @@ export interface RunSummary {
   terminal_status: string
   created_at: string
 }
+
+export interface TSPTraceEvent {
+  step_index: number
+  algorithm: string
+  line_number: number
+  line_pseudocode: string
+  event_type: string
+  description: string
+  current_city?: string | null
+  candidate_edges?: any[] | null
+  selected_edge?: any | null
+  current_tour?: string[] | null
+  sub_tours?: string[][] | null
+  savings_list?: [string, string, number][] | null
+  total_cost?: number
+  is_terminal?: boolean
+}
+
+export interface TSPResult {
+  algorithm: string
+  cities: string[]
+  tour: string[]
+  total_cost: number
+  total_steps: number
+  events: TSPTraceEvent[]
+}
+

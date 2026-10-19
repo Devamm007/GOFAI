@@ -8,7 +8,7 @@ import { AnalysisArea } from './components/AnalysisArea'
 import { StatsBanner } from './components/StatsBanner'
 import { GraphConfigModal } from './components/GraphConfigModal'
 import { HistoryModal } from './components/HistoryModal'
-import { Network, Sliders, History, Zap, RotateCcw } from 'lucide-react'
+import { Network, Sliders, History, Zap, RotateCcw, Menu } from 'lucide-react'
 import { apiUrl } from './utils/api'
 
 const DEFAULT_GRAPH: GraphData = {
@@ -27,9 +27,21 @@ const DEFAULT_GRAPH: GraphData = {
   metadata: { name: 'Default Search Tree' },
 }
 
-export const App: React.FC = () => {
+export interface AppProps {
+  initialAlgorithm?: string
+  onAlgorithmChange?: (algo: string) => void
+  onBackToOverview?: () => void
+  onOpenDrawer?: () => void
+}
+
+export const App: React.FC<AppProps> = ({
+  initialAlgorithm,
+  onAlgorithmChange,
+  onBackToOverview,
+  onOpenDrawer,
+}) => {
   const [graph, setGraph] = useState<GraphData>(DEFAULT_GRAPH)
-  const [algorithm, setAlgorithm] = useState<string>('BFS')
+  const [algorithm, setAlgorithm] = useState<string>(initialAlgorithm || 'BFS')
   const [runResult, setRunResult] = useState<SearchRunResponse | null>(null)
   const [events, setEvents] = useState<TraceEvent[]>([])
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0)
@@ -80,12 +92,21 @@ export const App: React.FC = () => {
 
   // Initial run on mount
   useEffect(() => {
-    runSearch(DEFAULT_GRAPH, 'BFS')
+    runSearch(DEFAULT_GRAPH, initialAlgorithm || 'BFS')
   }, [])
+
+  // Sync when initialAlgorithm changes from external navigation
+  useEffect(() => {
+    if (initialAlgorithm && initialAlgorithm !== algorithm) {
+      setAlgorithm(initialAlgorithm)
+      runSearch(graph, initialAlgorithm)
+    }
+  }, [initialAlgorithm])
 
   // When algorithm selector changes, run search
   const handleAlgorithmChange = (newAlgo: string) => {
     setAlgorithm(newAlgo)
+    onAlgorithmChange?.(newAlgo)
     runSearch(graph, newAlgo)
   }
 
@@ -235,28 +256,60 @@ export const App: React.FC = () => {
       >
         {/* Logo and Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onOpenDrawer && (
+            <button
+              onClick={onOpenDrawer}
+              style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 8px',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              title="Open Navigation Menu"
+            >
+              <Menu size={16} />
+            </button>
+          )}
+
           <div
+            onClick={onBackToOverview}
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #6366f1, #06b6d4)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
+              gap: 10,
+              cursor: onBackToOverview ? 'pointer' : 'default',
             }}
+            title={onBackToOverview ? 'Return to Lab Overview' : undefined}
           >
-            <Network size={18} color="#ffffff" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', color: '#ffffff', lineHeight: 1.2 }}>
-              Code-Faithful Search Algorithm Visualizer
-            </h1>
-            <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', gap: 5, alignItems: 'center' }}>
-              <span>IIT Madras AI SMPS T32026</span>
-              <span>•</span>
-              <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>Deterministic Engine</span>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #6366f1, #06b6d4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
+              }}
+            >
+              <Network size={18} color="#ffffff" />
+            </div>
+            <div>
+              <h1 style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', color: '#ffffff', lineHeight: 1.2 }}>
+                Code-Faithful Search Algorithm Visualizer
+              </h1>
+              <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', gap: 5, alignItems: 'center' }}>
+                <span>IIT Madras AI SMPS T32026</span>
+                <span>•</span>
+                <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>Deterministic Engine</span>
+              </div>
             </div>
           </div>
         </div>

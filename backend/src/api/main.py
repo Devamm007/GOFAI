@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from backend.src.core.graph import Graph, generate_graph
 from backend.src.core.search_engine import SearchEngine
+from backend.src.core.informed_search_engine import InformedSearchEngine
+from backend.src.core.tsp_engine import TSPEngine, TSPResult
 from backend.src.core.types import SearchResult, TraceEvent
 from backend.src.db.models import GraphRecord, RunRecord
 from backend.src.db.session import SPEC_VERSION, TRACE_VERSION, get_db, init_db
@@ -72,6 +74,25 @@ class SearchRunRequest(BaseModel):
     max_depth_bound: int = Field(default=50, ge=1, le=100)
     persist: bool = Field(default=True)
     name: Optional[str] = None
+
+
+class InformedSearchRunRequest(BaseModel):
+    graph: Graph
+    algorithm: str
+    heuristic: Dict[str, float] = Field(default_factory=dict)
+    beam_width: int = Field(default=2, ge=1, le=20)
+    restarts: int = Field(default=5, ge=1, le=50)
+    vnd_strategy: str = Field(default="k-hop")
+    persist: bool = Field(default=False)
+    name: Optional[str] = None
+
+
+class TSPRunRequest(BaseModel):
+    cities: List[str]
+    costs: Dict[str, Dict[str, float]]
+    algorithm: str
+    start_city: Optional[str] = None
+    base_city: Optional[str] = None
 
 
 class SearchRunResponse(BaseModel):
@@ -207,6 +228,112 @@ def api_run_search(req: SearchRunRequest, db: Session = Depends(get_db)):
         trace_version=TRACE_VERSION,
         events=result.events,
     )
+
+
+@api_router.post("/search/informed/run", response_model=SearchRunResponse)
+def api_run_informed_search(req: InformedSearchRunRequest, db: Session = Depends(get_db)):
+    valid_algos = {
+        "Best-First-Search",
+        "Beam-Search",
+        "Hill-Climbing",
+        "Variable-Neighbourhood-Descent",
+        "Best-Neighbour-Search",
+        "Iterated-Hill-Climbing",
+    }
+    if req.algorithm not in valid_algos:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported informed algorithm '{req.algorithm}'. Must be one of {valid_algos}",
+        )
+
+    engine = InformedSearchEngine(req.graph, req.heuristic)
+    if req.algorithm == "Best-First-Search":
+        result = engine.run_best_first_search()
+    elif req.algorithm == "Beam-Search":
+        result = engine.run_beam_search(beam_width=req.beam_width)
+    elif req.algorithm == "Hill-Climbing":
+        result = engine.run_hill_climbing()
+    elif req.algorithm == "Variable-Neighbourhood-Descent":
+        result = engine.run_variable_neighbourhood_descent(strategy=req.vnd_strategy)
+    elif req.algorithm == "Best-Neighbour-Search":
+        result = engine.run_best_neighbour_search()
+    elif req.algorithm == "Iterated-Hill-Climbing":
+        result = engine.run_iterated_hill_climbing(restarts=req.restarts)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid algorithm")
+
+    run_id: Optional[str] = None
+    if req.persist:
+        try:
+            run_rec = RunRecord(
+                algorithm=result.algorithm,
+                start_node=result.start_node,
+                goal_node=result.goal_node,
+                found_goal=result.found_goal,
+                path=result.path,
+                total_steps=result.total_steps,
+                nodes_expanded=result.nodes_expanded,
+                terminal_status=result.terminal_status,
+                terminal_reason=result.terminal_reason,
+                spec_version=SPEC_VERSION,
+                trace_version=TRACE_VERSION,
+                graph_snapshot=req.graph.to_dict(),
+                events_json=[ev.model_dump() for ev in result.events],
+            )
+            db.add(run_rec)
+            db.commit()
+            db.refresh(run_rec)
+            run_id = run_rec.id
+        except Exception as e:
+            db.rollback()
+            print(f"Warning: Failed to persist informed run record: {e}")
+
+    return SearchRunResponse(
+        run_id=run_id,
+        algorithm=result.algorithm,
+        start_node=result.start_node,
+        goal_node=result.goal_node,
+        found_goal=result.found_goal,
+        path=result.path,
+        total_steps=result.total_steps,
+        nodes_expanded=result.nodes_expanded,
+        terminal_status=result.terminal_status,
+        terminal_reason=result.terminal_reason,
+        spec_version=SPEC_VERSION,
+        trace_version=TRACE_VERSION,
+        events=result.events,
+    )
+
+
+@api_router.post("/search/tsp/run", response_model=TSPResult)
+def api_run_tsp(req: TSPRunRequest):
+    valid_algos = {
+        "Nearest-Neighbour-Heuristic",
+        "Greedy-Heuristic",
+        "Savings-Heuristic",
+    }
+    if req.algorithm not in valid_algos:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported TSP algorithm '{req.algorithm}'. Must be one of {valid_algos}",
+        )
+
+    flat_costs: Dict[Tuple[str, str], float] = {}
+    for u, neighbors in req.costs.items():
+        for v, c in neighbors.items():
+            flat_costs[(u, v)] = float(c)
+
+    engine = TSPEngine(cities=req.cities, costs=flat_costs)
+    if req.algorithm == "Nearest-Neighbour-Heuristic":
+        result = engine.run_nearest_neighbour(start_city=req.start_city)
+    elif req.algorithm == "Greedy-Heuristic":
+        result = engine.run_greedy_heuristic()
+    elif req.algorithm == "Savings-Heuristic":
+        result = engine.run_savings_heuristic(base_city=req.base_city)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid TSP algorithm")
+
+    return result
 
 
 @api_router.get("/runs", response_model=List[RunSummaryResponse])

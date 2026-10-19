@@ -951,7 +951,7 @@ export const TSPVisualizer: React.FC<TSPVisualizerProps> = ({
                 </div>
                 <div style={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {currentEvent?.savings_list && currentEvent.savings_list.length > 0 ? (
-                    currentEvent.savings_list.map(([a, b, s], idx) => {
+                    currentEvent.savings_list.map(([a, b, s]: [string, string, number], idx: number) => {
                       const isCurrentCandidate =
                         currentEvent?.selected_edge &&
                         ((currentEvent.selected_edge[0] === a && currentEvent.selected_edge[1] === b) ||
@@ -995,7 +995,7 @@ export const TSPVisualizer: React.FC<TSPVisualizerProps> = ({
                   Current Active Sub-Tours:
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {currentEvent.sub_tours.map((st, idx) => (
+                  {currentEvent.sub_tours.map((st: string[], idx: number) => (
                     <div
                       key={idx}
                       style={{

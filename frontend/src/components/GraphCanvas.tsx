@@ -27,8 +27,9 @@ const edgeTypes = {
   directed: DirectedStateEdge,
 }
 
-interface GraphCanvasProps {
+export interface GraphCanvasProps {
   graph: GraphData
+  heuristic?: Record<string, number>
   currentEvent?: TraceEvent | null
   finalPath?: string[] | null
   selectedNodeId?: string | null
@@ -37,6 +38,7 @@ interface GraphCanvasProps {
 
 const InnerGraphCanvas: React.FC<GraphCanvasProps> = ({
   graph,
+  heuristic,
   currentEvent,
   finalPath,
   selectedNodeId,
@@ -160,10 +162,11 @@ const InnerGraphCanvas: React.FC<GraphCanvasProps> = ({
           successors: graph.edges[nodeId] || [],
           isSelected,
           depth,
+          heuristicVal: heuristic && heuristic[nodeId] !== undefined ? heuristic[nodeId] : null,
         },
       }
     })
-  }, [graph, inspectedNode, openNodeSet, closedNodeSet, pathNodeSet, selectedNodeId, nodePositions, currentEvent])
+  }, [graph, inspectedNode, openNodeSet, closedNodeSet, pathNodeSet, selectedNodeId, nodePositions, currentEvent, heuristic])
 
   // Edges list with exact boundary calculations, reciprocal curves, and arrowheads
   const edges: Edge<DirectedEdgeData>[] = useMemo(() => {
